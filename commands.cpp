@@ -114,8 +114,25 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 	
 	else if (!strcmp(cmd, "jobs")) 
 	{
- 		
-	}
+		if (num_arg != 0)
+		{
+			illegal_cmd = TRUE;
+		}
+		else
+		{
+			long int curTime, jobDuration
+			curTime=time(NULL);
+			for (std::size_t i=0; i<Vjobs.size(); ++i)
+			{
+				jobDuration = curTime - Vjobs[i].getBeginningTime();
+				printf("[%lu] %s: %d %lu secs",i+1,Vjobs[i].getCmd().c_str(),Vjobs[i].getPid(),jobDuration);
+				if (Vjobs[i].isStopped()==true)
+				{
+					printf(" (Stopped)"); // check if the process was suspended
+				}
+				printf("\n");
+			}
+		}
 	/*************************************************/
 	else if (!strcmp(cmd, "showpid")) 
 	{
@@ -141,8 +158,86 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 	/*************************************************/
 	else if (!strcmp(cmd, "quit"))
 	{
-   		
-	} 
+		if (num_arg > 1)
+		{
+			illegal_cmd = TRUE;
+		}
+
+		else
+		{
+			if (!num_arg)
+			{
+				exit(0);
+			}
+
+			else if (!strcmp(args[1],"kill"))
+			{
+				long int timesofar, timeinfivesec;
+				for (std::size_t i=0; i<Vjobs.size(); ++i)
+				{
+					printf("[%lu] %s - Sending SIGTERM... ",i+1, Vjobs[i].getCmd().c_str());
+					kill(Vjobs[i].getPid(), SIGTERM);
+					timesofar=time(NULL);
+					timeinfivesec = timesofar + 5;
+					for(;timesofar <= timeinfivesec;timesofar=time(NULL));
+					if (timesofar>timeinfivesec&&!waitpid(Vjobs[i].getPid(), NULL, WNOHANG))
+						{
+							printf( "(5 sec passed) Sending SIGKILL... ");
+							kill(Vjobs[i].getPid(), SIGKILL); //sending SIGKILL to process that is not ending
+						}
+					printf( "Done.\n");
+				}
+				exit(0);
+			}
+			else
+				illegal_cmd = TRUE;
+		}
+ /*************************************************/
+	else if (!strcmp(cmd, "mv"))
+	{
+		if (num_arg != 2) 
+		{
+			illegal_cmd = TRUE;
+		}
+		else 
+		{
+			if (rename(args[1], args[2]) != 0)
+			{
+				fprintf(stderr,"rename has failed.\n");
+			}
+			else 
+			{
+				printf("%s has been renamed to %s\n",args[1],args[2]);
+			}
+		}
+	}
+
+	/*************************************************/
+	else if (!strcmp(cmd, "history"))
+	{
+		if (num_arg != 0)
+		{
+			illegal_cmd = TRUE;
+		}
+
+		else
+		{
+			for (std::size_t i=0; i<hist.size()-1; ++i)
+				printf("%s\n",hist[i].c_str());
+		}
+	}
+	/*************************************************/
+	else if (!strcmp(cmd, "kill"))
+	{
+				if (num_arg != 2)
+		{
+			illegal_cmd = TRUE;
+		}
+		else
+		{
+			// to be continued
+		}
+	}
 	/*************************************************/
 	else // external command
 	{
@@ -218,18 +313,19 @@ int ExeComp(char* lineSize) //I think THIS IS NOT NEEDED (according to the instr
 // Parameters: command string, pointer to jobs
 // Returns: 0- BG command -1- if not
 //**************************************************************************************
-int BgCmd(char* lineSize, void* jobs)
+int BgCmd(char* lineSize, char* cmdString)
 {
 
 	char* cmd;
 	char* args[MAX_ARG];
 	char* delimiters = (char*)" \t\n";
-	if (lineSize[strlen(lineSize)-2] == '&')
+
+	if (lineSize[strlen(lineSize) - 2] == '&')
 	{
-		lineSize[strlen(lineSize)-2] = '\0';
+		lineSize[strlen(lineSize) - 2] = '\0';
 		cmd = strtok(lineSize, delimiters);
-		//Similarily to the given function
-		// exeCmd
+									
+		   
 		if (cmd == NULL)
 			return 0;
 		int i = 0;
@@ -238,26 +334,30 @@ int BgCmd(char* lineSize, void* jobs)
 		{
 			args[i] = strtok(NULL, delimiters);
 		}
+
 		int pID;
 		switch (pID = fork())
 		{
-		case -1: //unsuccessful fork
+		case -1:
+			// Fork failed
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
 			return -1;
-			//a process that is a child process:
+
 		case 0:
+			//Child Process
 			setpgrp();
-			int val=execvp(args[0], args);
-			if (val < 0) //this indicates a problem
+			if (execvp(args[0], args) < 0)
+			//if we get here there was an error in execvp
 			{
 				fprintf(stderr,"Error while executing external command %s\n",args[0]);
 				kill(getpid(), SIGKILL);
 			}
 			return -1;
 
-		default: //performing in the *background, father process.
-			long int timeNow;
-			time(&timeNow);
+		default:
+			// Father Process
+			// Execute command in the background
+			long int timeNow=time(NULL);
 			Job* newJob = new Job(pID, string(cmdString), false, timeNow);
 			Vjobs.push_back(*newJob);
 			return 0;
@@ -265,4 +365,6 @@ int BgCmd(char* lineSize, void* jobs)
 	}
 	return -1;
 }
+
+
 
