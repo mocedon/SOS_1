@@ -80,7 +80,7 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			}
 			else
 			{
-				if (chdir[args[1]!=-1) //LEGAL PATH
+				if (chdir(args[1])!=-1) //LEGAL PATH
 				{
 					strcpy(prvpwd, pwd);
 					strcpy(pwd, args[1]);
@@ -120,7 +120,7 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 		}
 		else
 		{
-			long int curTime, jobDuration
+			long int curTime, jobDuration;
 			curTime=time(NULL);
 			for (std::size_t i=0; i<Vjobs.size(); ++i)
 			{
@@ -263,21 +263,23 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 	switch (pID = fork())
 	{
 	case -1: //fork is unsuccesful
+	{
 		printf("Error while executing external command %s\n",args[0]);
 		return;
-		
+	}
   
 	case 0:
+	{
 		// Child Process
 		setpgrp();
-		int val=execvp(args[0], args); //return of <0 indicates a problem.
+		int val = execvp(args[0], args); //return of <0 indicates a problem.
 		if (val < 0)
 		{
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
 			kill(getpid(), SIGKILL);
 		}
 		return;
-
+	}
 
 	default: //performs command in the *foreground
 		fgPid = pID;
@@ -285,6 +287,7 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 		waitpid(pID, NULL, WUNTRACED); //Wait for son process to finish
 		fgPid = 0;
 		return;
+	}
 	}
 }
 //**************************************************************************************
@@ -339,28 +342,32 @@ int BgCmd(char* lineSize, char* cmdString)
 		switch (pID = fork())
 		{
 		case -1:
-			// Fork failed
+		{
+			// Fork unsucessful
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
 			return -1;
+		}
 
 		case 0:
+		{
 			//Child Process
 			setpgrp();
-			if (execvp(args[0], args) < 0)
-			//if we get here there was an error in execvp
+			int val = execvp(args[0], args); // val indicates if there was a problem
+			if (val < 0)
 			{
 				fprintf(stderr,"Error while executing external command %s\n",args[0]);
 				kill(getpid(), SIGKILL);
 			}
 			return -1;
+		}
 
-		default:
-			// Father Process
-			// Execute command in the background
+		default: //running in the background
+		{
 			long int timeNow=time(NULL);
-			Job* newJob = new Job(pID, string(cmdString), false, timeNow);
+			Job* newJob = new Job(pID, string(cmdString), /*not stopped*/false, timeNow);
 			Vjobs.push_back(*newJob);
 			return 0;
+		}
 		}
 	}
 	return -1;
