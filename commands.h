@@ -1,16 +1,18 @@
 #ifndef _COMMANDS_H
 #define _COMMANDS_H
+#include <vector>
+#include <errno.h>
 #include <unistd.h> 
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <iostream>
-#include <vector>
-#include <errno.h>
+#include <math.h>
+#include <limits.h>
+#include <string.h>
 
 #define MAX_LINE_SIZE 80
 #define MAX_ARG 20
@@ -23,22 +25,41 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString);
 void ExeExternal(char *args[MAX_ARG], char* cmdString);
 
 class Job {
-private:
-	int _pid;
-	string _Cmd;
-	long int _beginningTime;
-	bool _stopped; 
-
-public:
-	Job(int pid, string cmd, bool stopped, long int beginningTime) :
-		_pid(pid), _Cmd(cmd), _stopped(stopped), _beginningTime(beginningTime) {}; //constructor
+protected: // allows further implementation of inherited classes if they will be needed.
+	string CMD;
+	int PID;
+	long int BEGINNINGTIME;
+	bool STOPPED;
 	
-	int getPid() { return _pid; }
-	string getCmd() { return _Cmd; }
-	bool isStopped() { return _stopped; }
-	long int getBeginningTime() { return _beginningTime;  };
-
-	void setStopped(bool stopped) { _stopped = stopped; }
+public:
+	//first constructor
+	Job(int pid, string cmd)
+	{
+		PID=pid;
+		CMD=cmd;
+		SetBeginningTimeToNow();
+		//granting stopped a default boolean value of 'false':
+		STOPPED=false;
+	};
+	//overload of the class constructor:
+	Job(int pid, string cmd, bool stopped)
+	{
+		PID=pid;
+		CMD=cmd;
+		SetBeginningTimeToNow();
+		//granting stopped a boolean value of 'stopped':
+		STOPPED=stopped;
+	};
+	bool isStopped() { return STOPPED; } // checks whether the job is stopped or not
+	long int getBeginningTime() { return BEGINNINGTIME;  }; //gets the time in which the job began
+	string getcmd() { return CMD; } // gets the Cmd
+	int getpid() { return PID; } //gets the pid
+	void SetBeginningTimeToNow() // sets the beginning time to now
+	{
+		BEGINNINGTIME=time(NULL);
+	}
+	void setStopped(bool stopped) { STOPPED = stopped; } //changes a job's stopped status to true or false, depending on the input.
+	
 };
 
 #endif

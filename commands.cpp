@@ -3,11 +3,16 @@
 #include "commands.h"
 #include "signals.h"
 #include <limits.h>
-char prvpwd[MAX_LINE_SIZE];
-vector<Job> Vjobs;
+
+int fgPid = 0; // global int which its default value of zero implies that no process is running in the foreground.
+string fgCmd; // this represents the command of the foreground.
+vector<Job> Vjobs; //a vector of Job class.
 vector<string> hist;
-int fgPid = 0;
-string fgCmd;
+//a vector that holds the history namely the past commands
+// up to the current point.
+char prvpwd[MAX_LINE_SIZE]; //this is a char[] which represents the previous command
+// given by the user.
+
 //********************************************
 // function name: ExeCmd
 // Description: interperts and executes built-in commands
@@ -30,8 +35,9 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 	{
 		args[i] = strtok(NULL, delimiters); 
 		if (args[i] != NULL) 
-			num_arg++; 				   
+			num_arg++; 
 	}
+
 	getcwd(pwd,sizeof(pwd));
 	//now we are adding the command to the history
 	hist.push_back(string(cmdString));
@@ -42,11 +48,13 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 	// now we are getting rid of jobs that are already finished:
 	for (vector<Job>::iterator iterator = Vjobs.begin(); iterator != Vjobs.end(); iterator++)
 	{
-		if (waitpid((*iterator).getPid(), NULL, WNOHANG))
+		if (waitpid((*iterator).getpid(), NULL, WNOHANG)) // erasing after waiting on the job.
 		{
 			Vjobs.erase(iterator);
 			iterator--;
 		}
+	}
+
 /*************************************************/
 // Built in Commands PLEASE NOTE NOT ALL REQUIRED
 // ARE IN THIS CHAIN OF IF COMMANDS. PLEASE ADD
@@ -63,7 +71,7 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			//using chdir to change directory.
 			if (!strcmp(args[1], "-"))
 			{
-				if (strcmp(prvpwd, "")) // if the previous path is not empty
+				if (strcmp(prvpwd, ""))
 				{
 					if (chdir(prvpwd)!=-1) //cd successful
 					{
@@ -91,6 +99,8 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 				}
 			}
 		}
+	} 
+
 	/*************************************************/
 	else if (!strcmp(cmd, "pwd")) 
 	{
@@ -104,14 +114,8 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			printf("%s\n",pwd);
 		}
 	}
-	
+
 	/*************************************************/
-	/*else if (!strcmp(cmd, "mkdir")) NOT NEEDED IN THE EXERCISE
-	{
- 		
-	}*/
-	/*************************************************/
-	
 	else if (!strcmp(cmd, "jobs")) 
 	{
 		if (num_arg != 0)
@@ -120,19 +124,21 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 		}
 		else
 		{
-			long int curTime, jobDuration;
-			curTime=time(NULL);
-			for (std::size_t i=0; i<Vjobs.size(); ++i)
+			long int jobDuration=0; //(prevent possibly unitiated values warnings)
+			long int curTime=0; //(prevent possibly unitiated values warnings)
+			for (curTime=time(NULL); i<Vjobs.size(); ++i)
 			{
 				jobDuration = curTime - Vjobs[i].getBeginningTime();
-				printf("[%lu] %s: %d %lu secs",i+1,Vjobs[i].getCmd().c_str(),Vjobs[i].getPid(),jobDuration);
+				printf("[%lu] %s: %d %lu secs",i+1,Vjobs[i].getcmd().c_str(),Vjobs[i].getpid(),jobDuration);
 				if (Vjobs[i].isStopped()==true)
 				{
-					printf(" (Stopped)"); // check if the process was suspended
+					printf(" (Stopped)");
 				}
 				printf("\n");
 			}
 		}
+	}
+
 	/*************************************************/
 	else if (!strcmp(cmd, "showpid")) 
 	{
@@ -145,16 +151,110 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			printf( "smash pid is %d\n",getpid());
 		}
 	}
+
 	/*************************************************/
 	else if (!strcmp(cmd, "fg")) 
 	{
-		
-	} 
+		if (num_arg > 1)
+		{
+			illegal_cmd = TRUE;
+		}
+
+		else
+		{
+			// we will find the right job
+			// then take it to fg
+			int Jindex =(num_arg)?atoi(args[0]-1):(Vjobs.size()-1);
+			// assuming jindex is legal we can proceed:
+			if (Jindex<Vjobs.size()&&Jindex>=0)
+			{
+				//insert to fgCmd the relevant job
+				fgCmd = string(Vjobs[Jindex].getcmd());
+				//print the fg Command
+				printf("%s\n", fgCmd.c_str());
+				//insert the right value to fgPid:
+				fgPid = Vjobs[Jindex].getpid();
+				//we are running in the foreground and waiting til the job is done:
+				kill(fgPid, SIGCONT); //signal for fgPid to continue
+				printf( "smash > signal SIGCONT was sent to pid %d\n",fgPid);
+				Vjobs.erase(Vjobs.begin()+Jindex); //updating Vjobs to exclude Jindex job
+				waitpid(fgPid, NULL, WUNTRACED); //wait until the fg job is done
+				fgPid = 0; //update fgPid that there is no foreground job anymore
+			}
+			else // jindex is illegal
+			{
+				fprintf(stderr,"smash error: > \"%s\"\n", cmdString);
+				return 1;
+			}
+		}
+	}
+
 	/*************************************************/
 	else if (!strcmp(cmd, "bg")) 
 	{
-  		
+		if (num_arg > 1)
+		{
+			illegal_cmd = TRUE;
+		}
+		else
+		{
+			if (num_arg) // perform in the bg of the desired job according to the number.
+			{
+				if ( atoi(args[1]) <= Vjobs.size() && atoi(args[1]) > 0) //atoi(args[1]) stands for the number of command
+				{
+					int cmdNumber = atoi(args[1]);
+					if (!(Vjobs[--cmdNumber].isStopped()))
+					{
+						printf("Job is already running in the background\n");
+					}
+					else // see whether the job is stopped, and adjust cmdNumber to Vjobs
+					{
+						printf("%s\n",Vjobs[cmdNumber].getcmd().c_str());
+						int pid_number = Vjobs[cmdNumber].getpid();
+						Vjobs[cmdNumber].setStopped(false);
+						 // now we are signaling to continue the process
+						kill(pid_number, SIGCONT);
+						printf("smash > signal SIGCONT was sent to pid %d\n",pid_number);
+					}
+				}
+				else
+					// there was a problem
+				{
+					fprintf(stderr,"smash error: > \"%s\"\n",cmdString);
+				}
+			}
+			else // bg without number
+			{
+				int lastStopped = INT_MIN;
+				bool isAnyJobStopped = false;
+				int i=0;
+				// lets find the last stopped one in Vjobs:
+				while (i<Vjobs.size())
+				{
+					if (i>lastStopped)
+					{
+						lastStopped = (Vjobs[i].isStopped())?i:lastStopped;
+					}
+					i++;
+				}
+				isAnyJobStopped=(lastStopped==INT_MIN)?true:isAnyJobStopped;
+				if (isAnyJobStopped) // found stopped job
+				{
+					Vjobs[lastStopped].setStopped(false);
+					printf("%s\n",Vjobs[lastStopped].getcmd().c_str());
+					//performing the last stopped job
+					kill(Vjobs[lastStopped].getpid(), SIGCONT); // signaling the job to continue
+					printf("smash > signal SIGCONT was sent to pid %d\n",Vjobs[lastStopped].getpid());
+				}
+				else
+				{
+					// no stopped jobs in Vjobs.
+					printf("There is no stopped job\n");
+				}
+			}
+		}
 	}
+
 	/*************************************************/
 	else if (!strcmp(cmd, "quit"))
 	{
@@ -175,15 +275,16 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 				long int timesofar, timeinfivesec;
 				for (std::size_t i=0; i<Vjobs.size(); ++i)
 				{
-					printf("[%lu] %s - Sending SIGTERM... ",i+1, Vjobs[i].getCmd().c_str());
-					kill(Vjobs[i].getPid(), SIGTERM);
+					printf("[%lu] %s - Sending SIGTERM... ",i+1, Vjobs[i].getcmd().c_str());
+					kill(Vjobs[i].getpid(), SIGTERM);
 					timesofar=time(NULL);
-					timeinfivesec = timesofar + 5;
-					for(;timesofar <= timeinfivesec;timesofar=time(NULL));
-					if (timesofar>timeinfivesec&&!waitpid(Vjobs[i].getPid(), NULL, WNOHANG))
+					for(timeinfivesec = timesofar + 5;timesofar <= timeinfivesec;timesofar=time(NULL));
+					//the following if occures
+					// if the process has not finished therefore we are signaling SIGKILL to kill it.
+					if (timesofar>timeinfivesec&&!waitpid(Vjobs[i].getpid(), NULL, WNOHANG))
 						{
 							printf( "(5 sec passed) Sending SIGKILL... ");
-							kill(Vjobs[i].getPid(), SIGKILL); //sending SIGKILL to process that is not ending
+							kill(Vjobs[i].getpid(), SIGKILL);
 						}
 					printf( "Done.\n");
 				}
@@ -192,7 +293,8 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			else
 				illegal_cmd = TRUE;
 		}
- /*************************************************/
+	}
+	/*************************************************/
 	else if (!strcmp(cmd, "mv"))
 	{
 		if (num_arg != 2) 
@@ -201,14 +303,18 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 		}
 		else 
 		{
-			if (rename(args[1], args[2]) != 0)
-			{
-				fprintf(stderr,"rename has failed.\n");
-			}
-			else 
+			//qutotation about mv:
+			/*On success, zero is returned.  On error, -1 is returned, and errno is
+       set appropriately.*/
+			if (!rename(args[1], args[2])) // return of 0 indicates success.
 			{
 				printf("%s has been renamed to %s\n",args[1],args[2]);
 			}
+			else
+			{
+				fprintf(stderr,"rename has failed.\n");
+			}
+
 		}
 	}
 
@@ -224,31 +330,80 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 		{
 			for (std::size_t i=0; i<hist.size()-1; ++i)
 				printf("%s\n",hist[i].c_str());
+			// explanation:
+			// we exclude the last command which is always "history"
 		}
 	}
+
 	/*************************************************/
 	else if (!strcmp(cmd, "kill"))
 	{
-				if (num_arg != 2)
+		if (num_arg != 2)
 		{
 			illegal_cmd = TRUE;
+			fprintf(stderr,"smash error: > \"%s\"\n", cmdString);
+			return 1;
 		}
+
 		else
 		{
-			// to be continued
+			int signal_number = abs(atoi(args[1]));
+			int target_job = atoi(args[2]) - 1;
+			// we can send the kill signal:
+			if (!signal_number&&target_job>=0&&target_job<=Vjobs.size()){					   
+				if (!kill((Vjobs[target_job]).getpid(), signal_number))
+				// return of 0 from kill indicates success on sending.
+				{
+					string signal_types[33] = { "SIGHUP","SIGINT","SIGQUIT","SIGILL","SIGTRAP","SIGABRT","SIGBUS","SIGFPE","SIGKILL","SIGUSR1",
+					"SIGSEGV","SIGUSR2","SIGPIPE","SIGALRM","SIGTERM","SIGSTKFLT","SIGCHLD","SIGCONT","SIGSTOP",
+					"SIGTSTP","SIGTTIN","SIGTTOU","SIGURG","SIGXCPU","SIGXFSZ","SIGVTALRM","SIGPROF","SIGWINCH",
+					"SIGIO","SIGPWR","SIGSYS","SIGRTMIN" };
+					const char* signalType = signal_types[signal_number-1].c_str();
+					printf("smash > signal %s was sent to pid %d\n",signalType, Vjobs[target_job].getpid());
+					bool sigstopstop = (signalType == "SIGSTOP") || (signalType == "SIGTSTP");
+					bool sigcont = signalType == "SIGCONT";
+					
+					if (sigstopstop) //we have to stop in this case:
+					{
+						Vjobs[target_job].setStopped(true);
+					}
+					else if (sigcont) //we have to continue
+					{
+						Vjobs[target_job].setStopped(false);
+					}
+					
+				}
+				else
+				{
+					fprintf(stderr,"smash error: > kill %s - cannot send signal\n",args[2]);
+					return 1;
+				}
+			}
+			else if (!signal_number)
+			// this deals with signal_number that is illegal
+			{
+				fprintf(stderr,"smash error: > kill %s - cannot send signal\n",args[2]);
+				return 1;
+			}
+
+			//check if job exists
+			else // this deals with job that is out of the Jobs range (0 to the size).
+			{
+				fprintf(stderr,"smash error: > kill %s - job does not exist\n",args[2]);
+				return 1;
+			}
 		}
 	}
+
 	/*************************************************/
-	else // external command
+	else 
 	{
  		ExeExternal(args, cmdString);
+		// if we got here,
+		 //execute a command which is an external one.
 	 	return 0;
 	}
-	if (illegal_cmd == TRUE)
-	{
-		fprintf(stderr,"smash error: > \"%s\"\n", cmdString);
-		return 1;
-	}
+
     return 0;
 }
 //**************************************************************************************
@@ -262,41 +417,42 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 	int pID;
 	switch (pID = fork())
 	{
+	case 0: // the son
+	{
+		setpgrp(); //same group
+		int val = execvp(args[0], args); //return of <0 indicates a problem.
+		if (val < 0)
+		{
+			fprintf(stderr,"Error while executing external command %s\n",args[0]);
+			kill(getpid(), SIGKILL); // we have to send a signal to kill the process.
+		}
+		return;
+	}
 	case -1: //fork is unsuccesful
 	{
 		printf("Error while executing external command %s\n",args[0]);
 		return;
 	}
-  
-	case 0:
-	{
-		// Child Process
-		setpgrp();
-		int val = execvp(args[0], args); //return of <0 indicates a problem.
-		if (val < 0)
-		{
-			fprintf(stderr,"Error while executing external command %s\n",args[0]);
-			kill(getpid(), SIGKILL);
-		}
-		return;
-	}
-
 	default: //performs command in the *foreground
-		fgPid = pID;
-		fgCmd = string(cmdString);
-		waitpid(pID, NULL, WUNTRACED); //Wait for son process to finish
-		fgPid = 0;
+	{
+		fgCmd = string(cmdString); //update the fgCmd
+		fgPid = pID; //here we are keeping fgPid updated (so it does not hold an incorrect value which can be snooped by another thread or process)
+		waitpid(fgPid, NULL, WUNTRACED); // sleep until the soon finishes.
+		fgPid = 0; // no foreground process is operating anymore.
 		return;
 	}
 	}
+ 
 }
+
 //**************************************************************************************
 // function name: ExeComp
 // Description: executes complicated command
 // Parameters: command string
 // Returns: 0- if complicated -1- if not
 //**************************************************************************************
-int ExeComp(char* lineSize) //I think THIS IS NOT NEEDED (according to the instructions)
+int ExeComp(char* lineSize) //this is redundant according to the exercise
+// not needed
 {
 	char ExtCmd[MAX_LINE_SIZE+2];
 	char *args[MAX_ARG];
@@ -338,9 +494,21 @@ int BgCmd(char* lineSize, char* cmdString)
 			args[i] = strtok(NULL, delimiters);
 		}
 
-		int pID;
-		switch (pID = fork())
+		int pid;
+		switch (pid = fork())
 		{
+		case 0: //this is the son
+		{
+			setpgrp(); // set the same group
+			int val = execvp(args[0], args); // val indicates if there was a problem
+			if (val < 0)
+			{
+				fprintf(stderr,"Error while executing external command %s\n",args[0]);
+				kill(getpid(), SIGKILL);
+				// signaling SIGKILL to finish the current son.
+			}
+			return -1;
+		}
 		case -1:
 		{
 			// Fork unsucessful
@@ -348,30 +516,15 @@ int BgCmd(char* lineSize, char* cmdString)
 			return -1;
 		}
 
-		case 0:
-		{
-			//Child Process
-			setpgrp();
-			int val = execvp(args[0], args); // val indicates if there was a problem
-			if (val < 0)
-			{
-				fprintf(stderr,"Error while executing external command %s\n",args[0]);
-				kill(getpid(), SIGKILL);
-			}
-			return -1;
-		}
-
 		default: //running in the background
 		{
-			long int timeNow=time(NULL);
-			Job* newJob = new Job(pID, string(cmdString), /*not stopped*/false, timeNow);
-			Vjobs.push_back(*newJob);
+			 //creating a job which its stopped is false, and using the current Time.
+			 //using the first constructor of the job class:
+			Job *addedJob = new Job(pid, string(cmdString));
+			Vjobs.push_back(*addedJob);
 			return 0;
 		}
 		}
 	}
 	return -1;
 }
-
-
-
