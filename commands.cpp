@@ -349,9 +349,9 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 		else
 		{
 			int signal_number = abs(atoi(args[1]));
-			int target_job = atoi(args[2]) - 1;
+			int target_job = atoi(args[2])-1;
 			// we can send the kill signal:
-			if (!signal_number&&target_job>=0&&target_job<=Vjobs.size()){					   
+			if (signal_number&&target_job>=0&&target_job<=Vjobs.size()){					   
 				if (!kill((Vjobs[target_job]).getpid(), signal_number))
 				// return of 0 from kill indicates success on sending.
 				{
