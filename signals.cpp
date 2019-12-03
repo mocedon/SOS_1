@@ -7,20 +7,21 @@
    Synopsis: handle the Control-C */
 #include "signals.h"
 
-
+extern int fgPid;
+extern char* L_Fg_Cmd;
 void handler_int(int sig_num){
 	printf("smash > signal SIGINT was sent to pid %d\n",getpid());
 	if (!L_Fg_Cmd[0]) return;
 	fflush(stdout);
-	kill(Fg_pid, SIGKILL);
+	kill(fgPid, SIGKILL);
 	
 	
 }
 
 void handler_stp(int sig_num){
 	printf("smash > signal SIGINT was sent to pid %d\n",getpid());
-	if (!L_Fg_Cmd[0] || !Fg_pid) return;
-	Fg_pid = 0;
+	if (!L_Fg_Cmd[0] || !fgPid) return;
+	fgPid = 0;
 	L_Fg_Cmd = '\0';
 	pause();
 }

@@ -4,13 +4,13 @@
 #include "signals.h"
 #include <limits.h>
 
-int fgPid = 0; // global int which its default value of zero implies that no process is running in the foreground.
-string fgCmd; // this represents the command of the foreground.
-vector<Job> Vjobs; //a vector of Job class.
-vector<string> hist;
+extern int fgPid; // global int which its default value of zero implies that no process is running in the foreground.
+extern string fgCmd; // this represents the command of the foreground.
+extern vector<Job> Vjobs; //a vector of Job class.
+extern vector<string> hist;
 //a vector that holds the history namely the past commands
 // up to the current point.
-char prvpwd[MAX_LINE_SIZE]; //this is a char[] which represents the previous command
+extern char prvpwd[MAX_LINE_SIZE]; //this is a char[] which represents the previous command
 // given by the user.
 
 //********************************************
@@ -425,8 +425,8 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 		if (val < 0)
 		{
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
-			printf("smash >  signal SIGKILL was sent to pid %d\n",Vjobs[i].getpid());
-			fflush(stdout);
+			//printf("smash >  signal SIGKILL was sent to pid %d\n",Vjobs[i].getpid());
+			//fflush(stdout);
 			kill(getpid(), SIGKILL); // we have to send a signal to kill the process.
 		}
 		return;
@@ -497,12 +497,12 @@ int BgCmd(char* lineSize, char* cmdString)
 			args[i] = strtok(NULL, delimiters);
 		}
 
-		pid_t pid;
+		int pid;
 		switch (pid = fork())
 		{
 		case 0: //this is the son
 		{
-			L_Fg_Cmd[0] = '\0';
+			//L_Fg_Cmd[0] = '\0';
 			setpgrp(); // set the same group
 			int val = execvp(args[0], args); // val indicates if there was a problem
 			if (val < 0)

@@ -10,11 +10,20 @@ main file. This file contains the main function of smash
 #include <signal.h>
 #include "commands.h"
 #include "signals.h"
+#include <vector>
 #define MAX_LINE_SIZE 80
 #define MAXARGS 20
 
+
+int fgPid; // global int which its default value of zero implies that no process is running in the foreground.
+string fgCmd; // this represents the command of the foreground.
+vector<Job> Vjobs; //a vector of Job class.
+vector<string> hist;
+//a vector that holds the history namely the past commands
+// up to the current point.
+char prvpwd[MAX_LINE_SIZE]; //this is a char[] which represents the previous command
+// given by the user.
 char* L_Fg_Cmd;
-pid_t Fg_pid;
 void* jobs = NULL; //This represents the list of jobs. Please change to a preferred type (e.g array of char*)
 char lineSize[MAX_LINE_SIZE]; 
 //**************************************************************************************
@@ -42,8 +51,8 @@ int main(int argc, char *argv[])
 	//NOTE: the signal handlers and the function/s that sets the handler should be found in siganls.c
 	//set your signal handlers here
 	/* add your code here */
-	if (!sigaction(SIGINT, &sa_int, NULL)) quit(-1);
-	if (!sigaction(SIGSTP, &sa_stp, NULL)) quit(-1);
+	if (!sigaction(SIGINT, &sa_int, NULL)) exit(-1);
+	if (!sigaction(SIGTSTP, &sa_stp, NULL)) exit(-1);
 	/************************************/
 
 	/************************************/
@@ -56,9 +65,9 @@ int main(int argc, char *argv[])
 			exit (-1); 
 	L_Fg_Cmd[0] = '\0';
 	
-	Fg_pid = 0;
+	fgPid=0;
 	
-	jobs = (void*)&Vjobs;
+	//jobs = (void*)&Vjobs;
 	
     	while (1)
     	{
@@ -66,39 +75,38 @@ int main(int argc, char *argv[])
 		fgets(lineSize, MAX_LINE_SIZE, stdin);
 		strcpy(cmdString, lineSize);    	
 		cmdString[strlen(lineSize)-1]='\0';
-		strcpy(L_Fg_Cmd, cmdString);
-		pid_t fork_res;
-		fork_res = fork();
-		switch(Fg_pid){
-			case 0:{ // Child process
+							  
+				 
+					
+				 
+							
 					// perform a complicated Command
-				if(!ExeComp(lineSize)) kill(getpid(), SIGKILL); 
+		if(!ExeComp(lineSize)) continue; 
 					// background command	
-				if(!BgCmd(lineSize, cmdString)) kill(getpid(), SIGKILL); 
+	 	if(!BgCmd(lineSize, cmdString)) continue; //changed jobs arg to cmdString
 					// built in commands
-				ExeCmd(jobs, lineSize, cmdString);
-				kill(getpid(), SIGKILL);
-			}
+		ExeCmd(jobs, lineSize, cmdString); //jobs is instead passed by global vector Vjobs.
+		
+	
+   
+					  
+		  
+	
+   
 			
-			case -1:{ // Failed
-				break;
-			}
-			
-			default:{
-				Fg_pid = fork_res;
-				waitpid(fork_res, NULL, 0);
-			}
+					  
+							   
+	
 		/* initialize for next line read*/
-		if(L_Fg_Cmd[0] == '\0'){
-			Job *addedJob = new Job(Fg_pid, string(cmdString));
-			Vjobs.pushback(*addedJob);
-		}
-		Fg_pid = 0;
-		L_Fg_Cmg[0]='\0';
+						  
+													  
+							 
+   
+			 
+				   
 		lineSize[0]='\0';
 		cmdString[0]='\0';
-		
+  
 	}
     return 0;
 }
-
