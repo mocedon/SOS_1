@@ -361,14 +361,14 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 					"SIGIO","SIGPWR","SIGSYS","SIGRTMIN" };
 					const char* signalType = signal_types[signal_number-1].c_str();
 					printf("smash > signal %s was sent to pid %d\n",signalType, Vjobs[target_job].getpid());
-					bool sigstopstop = (signalType == "SIGSTOP") || (signalType == "SIGTSTP");
-					bool sigcont = signalType == "SIGCONT";
-					
-					if (sigstopstop) //we have to stop in this case:
+					//bool sigstopstop = (signalType == "SIGSTOP") || (signalType == "SIGTSTP");
+					//bool sigcont = signalType == "SIGCONT";
+					if ((!strcmp(signalType,"SIGSTOP")) || !(strcmp(signalType,"SIGTSTP"))) //we have to stop in this case:
 					{
 						Vjobs[target_job].setStopped(true);
+
 					}
-					else if (sigcont) //we have to continue
+					else if (!strcmp(signalType,"SIGCONT")) //we have to continue
 					{
 						Vjobs[target_job].setStopped(false);
 					}
@@ -426,7 +426,7 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 		if (val < 0)
 		{
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
-			//printf("smash >  signal SIGKILL was sent to pid %d\n",Vjobs[i].getpid());
+			//printf("smash >  signal SIGKILL was sent to pid %d\n", getpid());
 			//fflush(stdout);
 			kill(getpid(), SIGKILL); // we have to send a signal to kill the process.
 		}
