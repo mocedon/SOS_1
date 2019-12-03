@@ -15,7 +15,7 @@ main file. This file contains the main function of smash
 #define MAXARGS 20
 
 
-int fgPid; // global int which its default value of zero implies that no process is running in the foreground.
+int fgPid=0; // global int which its default value of zero implies that no process is running in the foreground.
 string fgCmd; // this represents the command of the foreground.
 vector<Job> Vjobs; //a vector of Job class.
 vector<string> hist;
@@ -51,8 +51,12 @@ int main(int argc, char *argv[])
 	//NOTE: the signal handlers and the function/s that sets the handler should be found in siganls.c
 	//set your signal handlers here
 	/* add your code here */
-	if (!sigaction(SIGINT, &sa_int, NULL)) exit(-1);
-	if (!sigaction(SIGTSTP, &sa_stp, NULL)) exit(-1);
+	if (sigaction(SIGINT, &sa_int, NULL)==-1)
+	{exit(-1);
+	}
+	if (sigaction(SIGTSTP, &sa_stp, NULL)==-1)
+	{exit(-1);
+	}
 	/************************************/
 
 	/************************************/
