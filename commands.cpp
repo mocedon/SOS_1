@@ -130,7 +130,7 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 			for (i=0,curTime=time(NULL); i<Vjobs.size(); ++i)
 			{
 				jobDuration = curTime - Vjobs[i].getBeginningTime();
-				printf("[%lu] %s: %d %lu secs",i+1,Vjobs[i].getcmd().c_str(),Vjobs[i].getpid(),jobDuration);
+				printf("[%d] %s: %d %lu secs",i+1,Vjobs[i].getcmd().c_str(),Vjobs[i].getpid(),jobDuration);
 				if (Vjobs[i].isStopped()==true)
 				{
 					printf(" (Stopped)");
