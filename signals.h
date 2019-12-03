@@ -8,7 +8,11 @@
 #include <string.h>
 #include <signal.h>
 
+//SIGINT
+void handler_int(int sig_num);
 
+//SIGSTP
+void handler_stp(int sig_num);
 
 #endif
 

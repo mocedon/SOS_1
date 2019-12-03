@@ -414,6 +414,7 @@ int ExeCmd(void* jobs, char* lineSize, char* cmdString)
 //**************************************************************************************
 void ExeExternal(char *args[MAX_ARG], char* cmdString)
 {
+	// Add defaulting of sig handlers
 	int pID;
 	switch (pID = fork())
 	{
@@ -424,6 +425,8 @@ void ExeExternal(char *args[MAX_ARG], char* cmdString)
 		if (val < 0)
 		{
 			fprintf(stderr,"Error while executing external command %s\n",args[0]);
+			printf("smash >  signal SIGKILL was sent to pid %d\n",Vjobs[i].getpid());
+			fflush(stdout);
 			kill(getpid(), SIGKILL); // we have to send a signal to kill the process.
 		}
 		return;
@@ -494,16 +497,19 @@ int BgCmd(char* lineSize, char* cmdString)
 			args[i] = strtok(NULL, delimiters);
 		}
 
-		int pid;
+		pid_t pid;
 		switch (pid = fork())
 		{
 		case 0: //this is the son
 		{
+			L_Fg_Cmd[0] = '\0';
 			setpgrp(); // set the same group
 			int val = execvp(args[0], args); // val indicates if there was a problem
 			if (val < 0)
 			{
 				fprintf(stderr,"Error while executing external command %s\n",args[0]);
+				//printf("smash >  signal SIGKILL was sent to pid %d\n",Vjobs[i].getpid());
+				fflush(stdout);
 				kill(getpid(), SIGKILL);
 				// signaling SIGKILL to finish the current son.
 			}
